@@ -5,12 +5,12 @@
     <description>waiting...</description>
     <link>http://localhost:4000/</link>
     <atom:link href="http://localhost:4000/feed.xml" rel="self" type="application/rss+xml" />
-    <pubDate>Wed, 21 Mar 2018 22:55:19 +0800</pubDate>
-    <lastBuildDate>Wed, 21 Mar 2018 22:55:19 +0800</lastBuildDate>
+    <pubDate>Wed, 21 Mar 2018 23:11:14 +0800</pubDate>
+    <lastBuildDate>Wed, 21 Mar 2018 23:11:14 +0800</lastBuildDate>
     <generator>Jekyll v3.7.3</generator>
     
       <item>
-        <title>基于容器化的方案搭建nodejs应用部署平台（一）—— 综述</title>
+        <title>基于容器化的方案搭建 Node.js 应用部署平台（一）—— 综述</title>
         <description>&lt;h2 id=&quot;为什么要开发这样一个平台&quot;&gt;为什么要开发这样一个平台&lt;/h2&gt;
 
 &lt;p&gt;当我们想要写一个 Node.js 应用时，需要解决很多编写代码之外的事情（机器、环境、部署、etc），这很大程度上提高了编写应用的成本。Node Labs 平台将提供应用创建、运行环境、部署、监控等功能，让创建 Node.js 应用变得更加简单。&lt;/p&gt;
@@ -75,14 +75,14 @@
 &lt;p&gt;每个模块具体的实现接下来的博客会进行介绍，下一篇会详细讲解一个应用部署的整个流程。&lt;/p&gt;
 </description>
         <pubDate>Wed, 21 Mar 2018 00:00:00 +0800</pubDate>
-        <link>http://localhost:4000/2018/03/21/%E5%9F%BA%E4%BA%8E%E5%AE%B9%E5%99%A8%E5%8C%96%E7%9A%84%E6%96%B9%E6%A1%88%E6%90%AD%E5%BB%BAnodejs%E5%BA%94%E7%94%A8%E9%83%A8%E7%BD%B2%E5%B9%B3%E5%8F%B0-%E4%B8%80-%E7%BB%BC%E8%BF%B0/</link>
-        <guid isPermaLink="true">http://localhost:4000/2018/03/21/%E5%9F%BA%E4%BA%8E%E5%AE%B9%E5%99%A8%E5%8C%96%E7%9A%84%E6%96%B9%E6%A1%88%E6%90%AD%E5%BB%BAnodejs%E5%BA%94%E7%94%A8%E9%83%A8%E7%BD%B2%E5%B9%B3%E5%8F%B0-%E4%B8%80-%E7%BB%BC%E8%BF%B0/</guid>
+        <link>http://localhost:4000/2018/03/21/%E5%9F%BA%E4%BA%8E%E5%AE%B9%E5%99%A8%E5%8C%96%E7%9A%84%E6%96%B9%E6%A1%88%E6%90%AD%E5%BB%BA-Node.js-%E5%BA%94%E7%94%A8%E9%83%A8%E7%BD%B2%E5%B9%B3%E5%8F%B0-%E4%B8%80-%E7%BB%BC%E8%BF%B0/</link>
+        <guid isPermaLink="true">http://localhost:4000/2018/03/21/%E5%9F%BA%E4%BA%8E%E5%AE%B9%E5%99%A8%E5%8C%96%E7%9A%84%E6%96%B9%E6%A1%88%E6%90%AD%E5%BB%BA-Node.js-%E5%BA%94%E7%94%A8%E9%83%A8%E7%BD%B2%E5%B9%B3%E5%8F%B0-%E4%B8%80-%E7%BB%BC%E8%BF%B0/</guid>
         
         
       </item>
     
       <item>
-        <title>Node Gyp 编译 C++ Addons 踩坑经历</title>
+        <title>关于node一gyp 编译 C++ Addons 踩坑经历</title>
         <description>&lt;p&gt;今天在打包一个Node.js应用镜像的时候，报了一个这样的错：&lt;/p&gt;
 
 &lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&amp;gt; sleep@5.1.1 install /usr/src/app/node_modules/sleep
@@ -227,8 +227,8 @@ RUN npm config set sass_binary_site https://npm.taobao.org/mirrors/node-sass &am
 &lt;p&gt;再次构建项目镜像，OK，完成！&lt;/p&gt;
 </description>
         <pubDate>Wed, 21 Mar 2018 00:00:00 +0800</pubDate>
-        <link>http://localhost:4000/2018/03/21/node-gyp-%E7%BC%96%E8%AF%91-C++-Addons-%E8%B8%A9%E5%9D%91%E7%BB%8F%E5%8E%86/</link>
-        <guid isPermaLink="true">http://localhost:4000/2018/03/21/node-gyp-%E7%BC%96%E8%AF%91-C++-Addons-%E8%B8%A9%E5%9D%91%E7%BB%8F%E5%8E%86/</guid>
+        <link>http://localhost:4000/2018/03/21/%E5%85%B3%E4%BA%8Enode%E4%B8%80gyp-%E7%BC%96%E8%AF%91-C++-Addons-%E8%B8%A9%E5%9D%91%E7%BB%8F%E5%8E%86/</link>
+        <guid isPermaLink="true">http://localhost:4000/2018/03/21/%E5%85%B3%E4%BA%8Enode%E4%B8%80gyp-%E7%BC%96%E8%AF%91-C++-Addons-%E8%B8%A9%E5%9D%91%E7%BB%8F%E5%8E%86/</guid>
         
         
       </item>
