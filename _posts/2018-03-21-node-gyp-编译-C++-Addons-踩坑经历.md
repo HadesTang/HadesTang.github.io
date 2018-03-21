@@ -23,7 +23,7 @@ gyp ERR! not ok
 
 ```
 
-原来是项目引用了一个第三方的sleep模块，查看文档后发现这个模块是c++编写的，所以需要编译成.node文件。编译的工具是node-gyp，看起来这个工具好像依赖python，但是我的基础镜像只有node的环境。
+原来是项目引用了一个第三方的sleep模块，查看文档后发现这个模块是C++编写的，所以需要编译成.node文件。编译的工具是node-gyp，看起来这个工具好像依赖python，但是我的基础镜像只有node的环境。
 
 看来我需要构建一个包含node和python的基础镜像，于是我编写了下面的Dockerfile
 
@@ -131,7 +131,7 @@ gyp ERR! node-gyp -v v3.6.2
 gyp ERR! not ok
 
 ```
-看来镜像中还缺少c++编译的环境，可以选择安装build-base这个package：
+看来镜像中还缺少C++编译的环境，可以选择安装build-base这个package：
 
 ```
 FROM mhart/alpine-node:8
