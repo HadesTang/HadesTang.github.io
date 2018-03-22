@@ -5,8 +5,8 @@
     <description>waiting...</description>
     <link>http://localhost:4000/</link>
     <atom:link href="http://localhost:4000/feed.xml" rel="self" type="application/rss+xml" />
-    <pubDate>Fri, 23 Mar 2018 00:13:46 +0800</pubDate>
-    <lastBuildDate>Fri, 23 Mar 2018 00:13:46 +0800</lastBuildDate>
+    <pubDate>Fri, 23 Mar 2018 00:20:53 +0800</pubDate>
+    <lastBuildDate>Fri, 23 Mar 2018 00:20:53 +0800</lastBuildDate>
     <generator>Jekyll v3.7.3</generator>
     
       <item>
@@ -19,7 +19,7 @@
 
 &lt;p&gt;&lt;img src=&quot;//qhyxpicoss.kujiale.com/2018/03/22/LKZ23RAKAIB4ARYEAAAAABI8_1966x1198.png&quot; alt=&quot;image&quot; /&gt;&lt;/p&gt;
 
-&lt;p&gt;勾选所需要的触发条件，我选择在push操作发生的时候进行构建。&lt;/p&gt;
+&lt;p&gt;勾选所需要的触发条件，我选择在 push 操作发生的时候进行构建。&lt;/p&gt;
 
 &lt;p&gt;GitLab CI Service URL 后面是触发这个构建操作 api 调用的地址，这个 URL 待会儿是需要用到的。&lt;/p&gt;
 
@@ -27,7 +27,7 @@
 
 &lt;p&gt;打开 gitlab project ，点击 Settings ， 接着点击 Integrations 。&lt;/p&gt;
 
-&lt;p&gt;&lt;img src=&quot;&quot; alt=&quot;image&quot; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&quot;//qhyxpicoss.kujiale.com/2018/03/23/LKZZROQKAIB36X4SAAAAAEA8_1422x1082.png&quot; alt=&quot;image&quot; /&gt;&lt;/p&gt;
 
 &lt;p&gt;第一行 URL 填写的就是 jenkins 构建触发器配置页面 GitLab CI Service URL 后面的 URL 地址。默认勾选的 hook 是 push event 。&lt;/p&gt;
 
@@ -37,7 +37,7 @@
 
 &lt;p&gt;&lt;img src=&quot;//qhyxpicoss.kujiale.com/2018/03/23/LKZ23RAKAIB4ARYEAAAAABY8_1934x54.png&quot; alt=&quot;image&quot; /&gt;&lt;/p&gt;
 
-&lt;p&gt;看到 invalid token 突然想到刚才在 webhook 创建的时候有个 secrect token 没有填写，这个 token 应该就是 jenkins 那边提供进行 api 权限认真的。再回到 jenkins 构建触发器配置的页面，在一个不起眼的角落里发现了一个高级选项的按钮。&lt;/p&gt;
+&lt;p&gt;看到 invalid token 突然想到刚才在 webhook 创建的时候有个 secrect token 没有填写，这个 token 应该就是 jenkins 提供进行 api 权限认证的。再回到 jenkins 构建触发器配置的页面，在一个不起眼的角落里发现了一个高级选项的按钮。&lt;/p&gt;
 
 &lt;p&gt;&lt;img src=&quot;//qhyxpicoss.kujiale.com/2018/03/23/LKZ23RAKAIB4ARYEAAAAABQ8_2140x1182.png&quot; alt=&quot;image&quot; /&gt;&lt;/p&gt;
 

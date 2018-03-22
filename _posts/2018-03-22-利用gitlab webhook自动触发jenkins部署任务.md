@@ -6,7 +6,7 @@
 
 ![image](//qhyxpicoss.kujiale.com/2018/03/22/LKZ23RAKAIB4ARYEAAAAABI8_1966x1198.png)
 
-勾选所需要的触发条件，我选择在push操作发生的时候进行构建。
+勾选所需要的触发条件，我选择在 push 操作发生的时候进行构建。
 
 GitLab CI Service URL 后面是触发这个构建操作 api 调用的地址，这个 URL 待会儿是需要用到的。
 
@@ -14,7 +14,7 @@ GitLab CI Service URL 后面是触发这个构建操作 api 调用的地址，�
 
 打开 gitlab project ，点击 Settings ， 接着点击 Integrations 。
 
-![image]()
+![image](//qhyxpicoss.kujiale.com/2018/03/23/LKZZROQKAIB36X4SAAAAAEA8_1422x1082.png)
 
 第一行 URL 填写的就是 jenkins 构建触发器配置页面 GitLab CI Service URL 后面的 URL 地址。默认勾选的 hook 是 push event 。
 
@@ -24,7 +24,7 @@ GitLab CI Service URL 后面是触发这个构建操作 api 调用的地址，�
 
 ![image](//qhyxpicoss.kujiale.com/2018/03/23/LKZ23RAKAIB4ARYEAAAAABY8_1934x54.png)
 
-看到 invalid token 突然想到刚才在 webhook 创建的时候有个 secrect token 没有填写，这个 token 应该就是 jenkins 那边提供进行 api 权限认真的。再回到 jenkins 构建触发器配置的页面，在一个不起眼的角落里发现了一个高级选项的按钮。
+看到 invalid token 突然想到刚才在 webhook 创建的时候有个 secrect token 没有填写，这个 token 应该就是 jenkins 提供进行 api 权限认证的。再回到 jenkins 构建触发器配置的页面，在一个不起眼的角落里发现了一个高级选项的按钮。
 
 ![image](//qhyxpicoss.kujiale.com/2018/03/23/LKZ23RAKAIB4ARYEAAAAABQ8_2140x1182.png)
 
