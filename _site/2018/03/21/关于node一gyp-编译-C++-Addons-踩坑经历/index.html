@@ -1,0 +1,142 @@
+<p>今天在打包一个Node.js应用镜像的时候，报了一个这样的错：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>&gt; sleep@5.1.1 install /usr/src/app/node_modules/sleep
+&gt; node-gyp rebuild
+
+gyp ERR! configure error
+gyp ERR! stack Error: Can't find Python executable "python", you can set the PYTHON env variable.
+gyp ERR! stack     at PythonFinder.failNoPython (/usr/lib/node_modules/npm/node_modules/node-gyp/lib/configure.js:483:19)
+gyp ERR! stack     at PythonFinder.&lt;anonymous&gt; (/usr/lib/node_modules/npm/node_modules/node-gyp/lib/configure.js:397:16)
+gyp ERR! stack     at F (/usr/lib/node_modules/npm/node_modules/which/which.js:68:16)
+gyp ERR! stack     at E (/usr/lib/node_modules/npm/node_modules/which/which.js:80:29)
+gyp ERR! stack     at /usr/lib/node_modules/npm/node_modules/which/which.js:89:16
+gyp ERR! stack     at /usr/lib/node_modules/npm/node_modules/which/node_modules/isexe/index.js:42:5
+gyp ERR! stack     at /usr/lib/node_modules/npm/node_modules/which/node_modules/isexe/mode.js:8:5
+gyp ERR! stack     at FSReqWrap.oncomplete (fs.js:152:21)
+gyp ERR! System Linux 4.9.49-moby
+gyp ERR! command "/usr/bin/node" "/usr/lib/node_modules/npm/node_modules/node-gyp/bin/node-gyp.js" "rebuild"
+gyp ERR! cwd /usr/src/app/node_modules/sleep
+gyp ERR! node -v v8.9.1
+gyp ERR! node-gyp -v v3.6.2
+gyp ERR! not ok
+
+</code></pre></div></div>
+
+<p>原来是项目引用了一个第三方的sleep模块，查看文档后发现这个模块是C++编写的，所以需要编译成.node文件。编译的工具是node-gyp，看起来这个工具好像依赖python，但是我的基础镜像只有node的环境。</p>
+
+<p>看来我需要构建一个包含node和python的基础镜像，于是我编写了下面的Dockerfile</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>FROM mhart/alpine-node:8
+
+## 设置 node-sass 源 和 安装python
+
+RUN npm config set sass_binary_site https://npm.taobao.org/mirrors/node-sass &amp;&amp; \
+  apk add --update \
+      python \
+      python-dev \
+      py-pip \
+  &amp;&amp; rm -rf /var/cache/apk/*
+
+</code></pre></div></div>
+
+<p>看起来这样就可以构建出想要的基于node和python的镜像。先运行</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>docker build -t node-python .
+</code></pre></div></div>
+<p>不出意外的话应该可以成功构建我所需要的基础镜像。但是却卡在了这里</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Step 3/3 : RUN npm config set registry http://npm-registry.qunhequnhe.com/ &amp;&amp;     npm config set sass_binary_site https://npm.taobao.org/mirrors/node-sass &amp;&amp;   apk add --update       python       python-dev       py-pip       build-base   &amp;&amp; rm -rf /var/cache/apk/*
+ ---&gt; Running in f630a6320c4b
+fetch http://dl-cdn.alpinelinux.org/alpine/v3.6/main/x86_64/APKINDEX.tar.gz
+fetch http://dl-cdn.alpinelinux.org/alpine/v3.6/community/x86_64/APKINDEX.tar.gz
+
+</code></pre></div></div>
+<p>估计是http://dl-cdn.alpinelinux.org这个源访问不到的问题，那就用阿里的源来替代：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>FROM mhart/alpine-node:8
+
+# 使用阿里云的源
+ENV ALPINE_MIRROR "http://mirrors.aliyun.com/alpine"
+
+RUN echo "${ALPINE_MIRROR}/v3.7/main" &gt; /etc/apk/repositories;
+RUN echo "${ALPINE_MIRROR}/v3.7/community" &gt;&gt; /etc/apk/repositories;
+
+## 设置 node-sass 源 和 安装python
+
+RUN npm config set sass_binary_site https://npm.taobao.org/mirrors/node-sass &amp;&amp; \
+  apk add --update \
+      python \
+      python-dev \
+      py-pip \
+  &amp;&amp; rm -rf /var/cache/apk/*
+
+</code></pre></div></div>
+<p>这次终于成功地构建了node-python镜像。</p>
+
+<p>然后编写新的项目Dockerfile如下：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>FROM node-python
+
+# Create app directory
+WORKDIR /usr/src/app
+
+# Install app dependencies
+# A wildcard is used to ensure both package.json AND package-lock.json are copied
+# where available (npm@5+)
+COPY package*.json ./
+
+
+RUN npm install
+# If you are building your code for production
+# RUN npm install --only=production
+
+# Bundle app source
+COPY . .
+
+EXPOSE 7001
+
+CMD [ "npm", "build" ]
+CMD [ "npm", "start" ]
+
+</code></pre></div></div>
+
+<p>再次build项目镜像，没想到还是报错了：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>&gt; sleep@5.1.1 install /usr/src/app/node_modules/sleep
+&gt; node-gyp rebuild
+
+gyp ERR! build error
+gyp ERR! stack Error: not found: make
+gyp ERR! stack     at getNotFoundError (/usr/lib/node_modules/npm/node_modules/which/which.js:13:12)
+gyp ERR! stack     at F (/usr/lib/node_modules/npm/node_modules/which/which.js:68:19)
+gyp ERR! stack     at E (/usr/lib/node_modules/npm/node_modules/which/which.js:80:29)
+gyp ERR! stack     at /usr/lib/node_modules/npm/node_modules/which/which.js:89:16
+gyp ERR! stack     at /usr/lib/node_modules/npm/node_modules/which/node_modules/isexe/index.js:42:5
+gyp ERR! stack     at /usr/lib/node_modules/npm/node_modules/which/node_modules/isexe/mode.js:8:5
+gyp ERR! stack     at FSReqWrap.oncomplete (fs.js:152:21)
+gyp ERR! System Linux 4.9.49-moby
+gyp ERR! command "/usr/bin/node" "/usr/lib/node_modules/npm/node_modules/node-gyp/bin/node-gyp.js" "rebuild"
+gyp ERR! cwd /usr/src/app/node_modules/sleep
+gyp ERR! node -v v8.10.0
+gyp ERR! node-gyp -v v3.6.2
+gyp ERR! not ok
+
+</code></pre></div></div>
+<p>看来镜像中还缺少C++编译的环境，可以选择安装build-base这个package：</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>FROM mhart/alpine-node:8
+
+## 设置 node-sass 源 和 安装python以及编译工具
+
+RUN npm config set sass_binary_site https://npm.taobao.org/mirrors/node-sass &amp;&amp; \
+  apk add --update \
+      python \
+      python-dev \
+      py-pip \
+      build-base \
+  &amp;&amp; rm -rf /var/cache/apk/*
+
+</code></pre></div></div>
+<p>重新生成node-python镜像。</p>
+
+<p>再次构建项目镜像，OK，完成！</p>

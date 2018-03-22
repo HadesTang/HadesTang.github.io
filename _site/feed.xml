@@ -5,9 +5,56 @@
     <description>waiting...</description>
     <link>http://localhost:4000/</link>
     <atom:link href="http://localhost:4000/feed.xml" rel="self" type="application/rss+xml" />
-    <pubDate>Wed, 21 Mar 2018 23:11:14 +0800</pubDate>
-    <lastBuildDate>Wed, 21 Mar 2018 23:11:14 +0800</lastBuildDate>
+    <pubDate>Fri, 23 Mar 2018 00:13:46 +0800</pubDate>
+    <lastBuildDate>Fri, 23 Mar 2018 00:13:46 +0800</lastBuildDate>
     <generator>Jekyll v3.7.3</generator>
+    
+      <item>
+        <title>利用gitlab webhook自动触发jenkins部署任务</title>
+        <description>&lt;p&gt;之前所有项目每个环境的构建都对应 jenkins 上的一个任务，每次在 gitlab 上 push 代码之后，都需要手动在 jenkins 上点个部署。这显然比较麻烦。刚好最近了解到 jenkins 有构建触发器这样的功能，可以利用 gitlab webhook 来触发 jenkins 任务。&lt;/p&gt;
+
+&lt;p&gt;具体做法如下：&lt;/p&gt;
+
+&lt;p&gt;1、打开 jenkins 任务配置页面，点击构建触发器tab&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;//qhyxpicoss.kujiale.com/2018/03/22/LKZ23RAKAIB4ARYEAAAAABI8_1966x1198.png&quot; alt=&quot;image&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;勾选所需要的触发条件，我选择在push操作发生的时候进行构建。&lt;/p&gt;
+
+&lt;p&gt;GitLab CI Service URL 后面是触发这个构建操作 api 调用的地址，这个 URL 待会儿是需要用到的。&lt;/p&gt;
+
+&lt;p&gt;配置完 jenkins 之后，需要在 gitlab 里面配置 webhook&lt;/p&gt;
+
+&lt;p&gt;打开 gitlab project ，点击 Settings ， 接着点击 Integrations 。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;&quot; alt=&quot;image&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;第一行 URL 填写的就是 jenkins 构建触发器配置页面 GitLab CI Service URL 后面的 URL 地址。默认勾选的 hook 是 push event 。&lt;/p&gt;
+
+&lt;p&gt;点击最下面的 Add webhook ，任务似乎就这样完成了。&lt;/p&gt;
+
+&lt;p&gt;于是我点击了 webhook 旁边的 test 按钮，测试一下对 jenkins 的调用是否生效。果然，接口报了401的错误。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;//qhyxpicoss.kujiale.com/2018/03/23/LKZ23RAKAIB4ARYEAAAAABY8_1934x54.png&quot; alt=&quot;image&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;看到 invalid token 突然想到刚才在 webhook 创建的时候有个 secrect token 没有填写，这个 token 应该就是 jenkins 那边提供进行 api 权限认真的。再回到 jenkins 构建触发器配置的页面，在一个不起眼的角落里发现了一个高级选项的按钮。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;//qhyxpicoss.kujiale.com/2018/03/23/LKZ23RAKAIB4ARYEAAAAABQ8_2140x1182.png&quot; alt=&quot;image&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;点开之后发现有生成 secrect token 的功能。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;//qhyxpicoss.kujiale.com/2018/03/23/LKZZROQKAIB36X4SAAAAADY8_1808x592.png&quot; alt=&quot;image&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;勾选所需配置之后，点击 generate 按钮生成 secrect token 。&lt;/p&gt;
+
+&lt;p&gt;将这里生成的 secret token 加入 webhook 的配置中，点击报错，再次尝试，这次成功地触发了 jenkins 任务的构建，大功告成！&lt;/p&gt;
+</description>
+        <pubDate>Thu, 22 Mar 2018 00:00:00 +0800</pubDate>
+        <link>http://localhost:4000/2018/03/22/%E5%88%A9%E7%94%A8gitlab-webhook%E8%87%AA%E5%8A%A8%E8%A7%A6%E5%8F%91jenkins%E9%83%A8%E7%BD%B2%E4%BB%BB%E5%8A%A1/</link>
+        <guid isPermaLink="true">http://localhost:4000/2018/03/22/%E5%88%A9%E7%94%A8gitlab-webhook%E8%87%AA%E5%8A%A8%E8%A7%A6%E5%8F%91jenkins%E9%83%A8%E7%BD%B2%E4%BB%BB%E5%8A%A1/</guid>
+        
+        
+      </item>
     
       <item>
         <title>基于容器化的方案搭建 Node.js 应用部署平台（一）—— 综述</title>
