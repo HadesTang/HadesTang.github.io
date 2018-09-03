@@ -1,0 +1,880 @@
+在真正深入了解React的ref之前。除了官方的文档[Refs and the DOM](https://reactjs.org/docs/refs-and-the-dom.html)和[Forwarding Refs](https://reactjs.org/docs/forwarding-refs.html)，我还参考了网上的一些教程。但是在阅读的时候却发现它们只针对ref的使用方法和场景做了一些简单的讲解，至于ref究竟是如何产生、何时挂载等等并没有详细的说明。
+
+还有比如官方文档标注的注意事项：
+> - When the ref attribute is used on an HTML element, the ref created in the constructor with React.createRef() receives the underlying DOM element as its current property.
+> - When the ref attribute is used on a custom class component, the ref object receives the mounted instance of the component as its current.
+> - You may not use the ref attribute on functional components because they don’t have instances.
+
+为什么自定义组建类和html元素的Ref属性值会不一样？
+
+函数式的组件不能使用ref属性，是因为它没有实例。那么为什么函数式的组件没有实例呢？
+
+本文意在通过深入React源码（v16.4.2），结合官方的一些示例，进一步探索React Ref的原理，解决这一系列衍生的问题。
+
+# What is Ref
+在我的理解里，ref即reference的缩写，指的是当前组件真实实例的引用。关于React Element、Instance、Component的详细解释可以看[这里](https://reactjs.org/blog/2015/12/18/react-components-elements-and-instances.html)。
+
+# What can React Ref do
+> Refs provide a way to access DOM nodes or React elements created in the render method.
+
+有了这样的一个引用，我们可以
+- 访问和操作dom节点
+- 在父子组件间传递实例，解决无法通过props通信的问题
+- ...
+
+# Dive deep into React Ref
+
+好，现在我们来解决第一个问题
+
+## Ref是如何产生的
+
+通过官网上一个简单的例子来创建ref。
+```js
+class MyComponent extends React.Component {
+  constructor(props) {
+    super(props);
+    this.myRef = React.createRef();
+  }
+  render() {
+    return <div ref={this.myRef} />;
+  }
+}
+```
+
+经过漫长的断点调试之后（以下省略半小时），我的chrome devtool定格在了这里
+
+![](https://hadestang-blog.oss-cn-beijing.aliyuncs.com/1.png)
+
+我们仔细看看这一段代码
+```js
+function commitAttachRef(finishedWork: Fiber) {
+  const ref = finishedWork.ref;
+  if (ref !== null) {
+    const instance = finishedWork.stateNode;
+    let instanceToUse;
+    switch (finishedWork.tag) {
+      case HostComponent:
+        instanceToUse = getPublicInstance(instance);
+        break;
+      default:
+        instanceToUse = instance;
+    }
+    if (typeof ref === 'function') {
+      ref(instanceToUse);
+    } else {
+      if (__DEV__) {
+        if (!ref.hasOwnProperty('current')) {
+          warningWithoutStack(
+            false,
+            'Unexpected ref object provided for %s. ' +
+              'Use either a ref-setter function or React.createRef().%s',
+            getComponentName(finishedWork.type),
+            getStackByFiberInDevAndProd(finishedWork),
+          );
+        }
+      }
+
+      ref.current = instanceToUse;
+    }
+  }
+}
+```
+
+从方法名我们大概可以知道这个方法是用来在commit阶段挂载ref的，可以提取两点重要信息
+
+1. ref对应的instance是finishedWork这个fiberNode的stateNode属性。具体的内容我们待会儿再看。
+2. ref本身支持两种写法，一种是通过React.createRef()方法生成ref对象
+```js
+export function createRef(): RefObject {
+  const refObject = {
+    current: null,
+  };
+  if (__DEV__) {
+    Object.seal(refObject);
+  }
+  return refObject;
+}
+
+```
+这种情况下会直接将instance挂载到ref上。
+
+另一种是通过回调方法的方式，这种情况下会将instance作为参数传递到回调中并执行。第二种方法是在React之前版本获取ref比较通用的做法。
+
+好了，现在让我们回到第一点。这个instance到底是什么？
+
+我们注意到对于tag属性的不同值，获取instance的行为并不同。那么fiberNode的tag属性到底是啥呢
+```js
+export type Fiber = {|
+  // These first fields are conceptually members of an Instance. This used to
+  // be split into a separate type and intersected with the other Fiber fields,
+  // but until Flow fixes its intersection bugs, we've merged them into a
+  // single type.
+
+  // An Instance is shared between all versions of a component. We can easily
+  // break this out into a separate object to avoid copying so much to the
+  // alternate versions of the tree. We put this on a single object for now to
+  // minimize the number of objects created during the initial render.
+
+  // Tag identifying the type of fiber.
+  tag: WorkTag,
+```
+这个tag的类型是WorkTag
+
+```js
+export type WorkTag =
+  | 0
+  | 1
+  | 2
+  | 3
+  | 4
+  | 5
+  | 6
+  | 7
+  | 8
+  | 9
+  | 10
+  | 11
+  | 12
+  | 13
+  | 14
+  | 15
+  | 16;
+
+export const FunctionalComponent = 0;
+export const FunctionalComponentLazy = 1;
+export const ClassComponent = 2;
+export const ClassComponentLazy = 3;
+export const IndeterminateComponent = 4; // Before we know whether it is functional or class
+export const HostRoot = 5; // Root of a host tree. Could be nested inside another node.
+export const HostPortal = 6; // A subtree. Could be an entry point to a different renderer.
+export const HostComponent = 7;
+export const HostText = 8;
+export const Fragment = 9;
+export const Mode = 10;
+export const ContextConsumer = 11;
+export const ContextProvider = 12;
+export const ForwardRef = 13;
+export const ForwardRefLazy = 14;
+export const Profiler = 15;
+export const PlaceholderComponent = 16;
+
+```
+上面是全部的WorkTag的类型
+
+对于HostComponent，会调用getPublicInstance方法
+```js
+export function getPublicInstance(instance: Instance): * {
+  return instance;
+}
+
+```
+好嘛，直接返回了instance。
+
+那么有人就要问了，为什么还要多次一举加个getPublicInstance方法呢。
+
+在React源码中搜一下getPublicInstance，会发现有一大堆的定义：![](https://hadestang-blog.oss-cn-beijing.aliyuncs.com/2.png)
+
+不同的host环境对应的不同的getPublicInstance方法，我们只关心ReactDOMHostConfig。所以对于我们常规的web开发来说，ref就是finishedWork.stateNode。只要我们找到了finishedWork，就找到了ref。
+```js
+export function createFiberRoot(
+  containerInfo: any,
+  isAsync: boolean,
+  hydrate: boolean,
+): FiberRoot {
+  // Cyclic construction. This cheats the type system right now because
+  // stateNode is any.
+  const uninitializedFiber = createHostRootFiber(isAsync);
+
+  let root;
+  if (enableSchedulerTracking) {
+    root = ({
+      current: uninitializedFiber,
+      containerInfo: containerInfo,
+      pendingChildren: null,
+
+      earliestPendingTime: NoWork,
+      latestPendingTime: NoWork,
+      earliestSuspendedTime: NoWork,
+      latestSuspendedTime: NoWork,
+      latestPingedTime: NoWork,
+
+      didError: false,
+
+      pendingCommitExpirationTime: NoWork,
+      finishedWork: null,
+      timeoutHandle: noTimeout,
+      context: null,
+      pendingContext: null,
+      hydrate,
+      nextExpirationTimeToWorkOn: NoWork,
+      expirationTime: NoWork,
+      firstBatch: null,
+      nextScheduledRoot: null,
+
+      interactionThreadID: unstable_getThreadID(),
+      memoizedInteractions: new Set(),
+      pendingInteractionMap: new Map(),
+    }: FiberRoot);
+  } else {
+    root = ({
+      current: uninitializedFiber,
+      containerInfo: containerInfo,
+      pendingChildren: null,
+
+      earliestPendingTime: NoWork,
+      latestPendingTime: NoWork,
+      earliestSuspendedTime: NoWork,
+      latestSuspendedTime: NoWork,
+      latestPingedTime: NoWork,
+
+      didError: false,
+
+      pendingCommitExpirationTime: NoWork,
+      finishedWork: null,
+      timeoutHandle: noTimeout,
+      context: null,
+      pendingContext: null,
+      hydrate,
+      nextExpirationTimeToWorkOn: NoWork,
+      expirationTime: NoWork,
+      firstBatch: null,
+      nextScheduledRoot: null,
+    }: BaseFiberRootProperties);
+  }
+
+  uninitializedFiber.stateNode = root;
+
+  // The reason for the way the Flow types are structured in this file,
+  // Is to avoid needing :any casts everywhere interaction tracking fields are used.
+  // Unfortunately that requires an :any cast for non-interaction tracking capable builds.
+  // $FlowFixMe Remove this :any cast and replace it with something better.
+  return ((root: any): FiberRoot);
+}
+```
+对于根节点来说，stateNode就是初始化时的root对象。
+
+对于其他的tag
+```js
+function beginWork(
+  current: Fiber | null,
+  workInProgress: Fiber,
+  renderExpirationTime: ExpirationTime,
+): Fiber | null {
+  const updateExpirationTime = workInProgress.expirationTime;
+  if (
+    !hasLegacyContextChanged() &&
+    (updateExpirationTime === NoWork ||
+      updateExpirationTime > renderExpirationTime)
+  ) {
+    // This fiber does not have any pending work. Bailout without entering
+    // the begin phase. There's still some bookkeeping we that needs to be done
+    // in this optimized path, mostly pushing stuff onto the stack.
+    switch (workInProgress.tag) {
+      case HostRoot:
+        pushHostRootContext(workInProgress);
+        resetHydrationState();
+        break;
+      case HostComponent:
+        pushHostContext(workInProgress);
+        break;
+      case ClassComponent: {
+        const Component = workInProgress.type;
+        if (isLegacyContextProvider(Component)) {
+          pushLegacyContextProvider(workInProgress);
+        }
+        break;
+      }
+      case ClassComponentLazy: {
+        const thenable = workInProgress.type;
+        const Component = getResultFromResolvedThenable(thenable);
+        if (isLegacyContextProvider(Component)) {
+          pushLegacyContextProvider(workInProgress);
+        }
+        break;
+      }
+      case HostPortal:
+        pushHostContainer(
+          workInProgress,
+          workInProgress.stateNode.containerInfo,
+        );
+        break;
+      case ContextProvider: {
+        const newValue = workInProgress.memoizedProps.value;
+        pushProvider(workInProgress, newValue);
+        break;
+      }
+      case Profiler:
+        if (enableProfilerTimer) {
+          workInProgress.effectTag |= Update;
+        }
+        break;
+    }
+    return bailoutOnAlreadyFinishedWork(
+      current,
+      workInProgress,
+      renderExpirationTime,
+    );
+  }
+
+  // Before entering the begin phase, clear the expiration time.
+  workInProgress.expirationTime = NoWork;
+
+  switch (workInProgress.tag) {
+    case IndeterminateComponent: {
+      const Component = workInProgress.type;
+      return mountIndeterminateComponent(
+        current,
+        workInProgress,
+        Component,
+        renderExpirationTime,
+      );
+    }
+    case FunctionalComponent: {
+      const Component = workInProgress.type;
+      const unresolvedProps = workInProgress.pendingProps;
+      return updateFunctionalComponent(
+        current,
+        workInProgress,
+        Component,
+        unresolvedProps,
+        renderExpirationTime,
+      );
+    }
+    case FunctionalComponentLazy: {
+      const thenable = workInProgress.type;
+      const Component = getResultFromResolvedThenable(thenable);
+      const unresolvedProps = workInProgress.pendingProps;
+      const child = updateFunctionalComponent(
+        current,
+        workInProgress,
+        Component,
+        resolveDefaultProps(Component, unresolvedProps),
+        renderExpirationTime,
+      );
+      workInProgress.memoizedProps = unresolvedProps;
+      return child;
+    }
+    case ClassComponent: {
+      const Component = workInProgress.type;
+      const unresolvedProps = workInProgress.pendingProps;
+      return updateClassComponent(
+        current,
+        workInProgress,
+        Component,
+        unresolvedProps,
+        renderExpirationTime,
+      );
+    }
+    case ClassComponentLazy: {
+      const thenable = workInProgress.type;
+      const Component = getResultFromResolvedThenable(thenable);
+      const unresolvedProps = workInProgress.pendingProps;
+      const child = updateClassComponent(
+        current,
+        workInProgress,
+        Component,
+        resolveDefaultProps(Component, unresolvedProps),
+        renderExpirationTime,
+      );
+      workInProgress.memoizedProps = unresolvedProps;
+      return child;
+    }
+    case HostRoot:
+      return updateHostRoot(current, workInProgress, renderExpirationTime);
+    case HostComponent:
+      return updateHostComponent(current, workInProgress, renderExpirationTime);
+    case HostText:
+      return updateHostText(current, workInProgress);
+    case PlaceholderComponent:
+      return updatePlaceholderComponent(
+        current,
+        workInProgress,
+        renderExpirationTime,
+      );
+    case HostPortal:
+      return updatePortalComponent(
+        current,
+        workInProgress,
+        renderExpirationTime,
+      );
+    case ForwardRef: {
+      const type = workInProgress.type;
+      return updateForwardRef(
+        current,
+        workInProgress,
+        type,
+        workInProgress.pendingProps,
+        renderExpirationTime,
+      );
+    }
+    case ForwardRefLazy:
+      const thenable = workInProgress.type;
+      const Component = getResultFromResolvedThenable(thenable);
+      const unresolvedProps = workInProgress.pendingProps;
+      const child = updateForwardRef(
+        current,
+        workInProgress,
+        Component,
+        resolveDefaultProps(Component, unresolvedProps),
+        renderExpirationTime,
+      );
+      workInProgress.memoizedProps = unresolvedProps;
+      return child;
+    case Fragment:
+      return updateFragment(current, workInProgress, renderExpirationTime);
+    case Mode:
+      return updateMode(current, workInProgress, renderExpirationTime);
+    case Profiler:
+      return updateProfiler(current, workInProgress, renderExpirationTime);
+    case ContextProvider:
+      return updateContextProvider(
+        current,
+        workInProgress,
+        renderExpirationTime,
+      );
+    case ContextConsumer:
+      return updateContextConsumer(
+        current,
+        workInProgress,
+        renderExpirationTime,
+      );
+    default:
+      invariant(
+        false,
+        'Unknown unit of work tag. This error is likely caused by a bug in ' +
+          'React. Please file an issue.',
+      );
+  }
+}
+
+```
+我们先分析ClassComponent，就是通过类声明的方式创建的Component。
+```js
+function updateClassComponent(
+  current: Fiber | null,
+  workInProgress: Fiber,
+  Component: any,
+  nextProps,
+  renderExpirationTime: ExpirationTime,
+) {
+  // Push context providers early to prevent context stack mismatches.
+  // During mounting we don't know the child context yet as the instance doesn't exist.
+  // We will invalidate the child context in finishClassComponent() right after rendering.
+  let hasContext;
+  if (isLegacyContextProvider(Component)) {
+    hasContext = true;
+    pushLegacyContextProvider(workInProgress);
+  } else {
+    hasContext = false;
+  }
+  prepareToReadContext(workInProgress, renderExpirationTime);
+
+  let shouldUpdate;
+  if (current === null) {
+    if (workInProgress.stateNode === null) {
+      // In the initial pass we might need to construct the instance.
+      constructClassInstance(
+        workInProgress,
+        Component,
+        nextProps,
+        renderExpirationTime,
+      );
+      mountClassInstance(
+        workInProgress,
+        Component,
+        nextProps,
+        renderExpirationTime,
+      );
+      shouldUpdate = true;
+    } else {
+      // In a resume, we'll already have an instance we can reuse.
+      shouldUpdate = resumeMountClassInstance(
+        workInProgress,
+        Component,
+        nextProps,
+        renderExpirationTime,
+      );
+    }
+  } else {
+    shouldUpdate = updateClassInstance(
+      current,
+      workInProgress,
+      Component,
+      nextProps,
+      renderExpirationTime,
+    );
+  }
+  return finishClassComponent(
+    current,
+    workInProgress,
+    Component,
+    shouldUpdate,
+    hasContext,
+    renderExpirationTime,
+  );
+}
+```
+
+其中constructClassInstance方法是用来创建instance实例
+```
+function constructClassInstance(
+  workInProgress: Fiber,
+  ctor: any,
+  props: any,
+  renderExpirationTime: ExpirationTime,
+): any {
+  const unmaskedContext = getUnmaskedContext(workInProgress, ctor, true);
+  const contextTypes = ctor.contextTypes;
+  const isContextConsumer = contextTypes !== null && contextTypes !== undefined;
+  const context = isContextConsumer
+    ? getMaskedContext(workInProgress, unmaskedContext)
+    : emptyContextObject;
+
+  // Instantiate twice to help detect side-effects.
+  if (__DEV__) {
+    if (
+      debugRenderPhaseSideEffects ||
+      (debugRenderPhaseSideEffectsForStrictMode &&
+        workInProgress.mode & StrictMode)
+    ) {
+      new ctor(props, context); // eslint-disable-line no-new
+    }
+  }
+
+  const instance = new ctor(props, context);
+  const state = (workInProgress.memoizedState =
+    instance.state !== null && instance.state !== undefined
+      ? instance.state
+      : null);
+  adoptClassInstance(workInProgress, instance);
+
+  if (__DEV__) {
+    if (typeof ctor.getDerivedStateFromProps === 'function' && state === null) {
+      const componentName = getComponentName(ctor) || 'Component';
+      if (!didWarnAboutUninitializedState.has(componentName)) {
+        didWarnAboutUninitializedState.add(componentName);
+        warningWithoutStack(
+          false,
+          '`%s` uses `getDerivedStateFromProps` but its initial state is ' +
+            '%s. This is not recommended. Instead, define the initial state by ' +
+            'assigning an object to `this.state` in the constructor of `%s`. ' +
+            'This ensures that `getDerivedStateFromProps` arguments have a consistent shape.',
+          componentName,
+          instance.state === null ? 'null' : 'undefined',
+          componentName,
+        );
+      }
+    }
+
+    // If new component APIs are defined, "unsafe" lifecycles won't be called.
+    // Warn about these lifecycles if they are present.
+    // Don't warn about react-lifecycles-compat polyfilled methods though.
+    if (
+      typeof ctor.getDerivedStateFromProps === 'function' ||
+      typeof instance.getSnapshotBeforeUpdate === 'function'
+    ) {
+      let foundWillMountName = null;
+      let foundWillReceivePropsName = null;
+      let foundWillUpdateName = null;
+      if (
+        typeof instance.componentWillMount === 'function' &&
+        instance.componentWillMount.__suppressDeprecationWarning !== true
+      ) {
+        foundWillMountName = 'componentWillMount';
+      } else if (typeof instance.UNSAFE_componentWillMount === 'function') {
+        foundWillMountName = 'UNSAFE_componentWillMount';
+      }
+      if (
+        typeof instance.componentWillReceiveProps === 'function' &&
+        instance.componentWillReceiveProps.__suppressDeprecationWarning !== true
+      ) {
+        foundWillReceivePropsName = 'componentWillReceiveProps';
+      } else if (
+        typeof instance.UNSAFE_componentWillReceiveProps === 'function'
+      ) {
+        foundWillReceivePropsName = 'UNSAFE_componentWillReceiveProps';
+      }
+      if (
+        typeof instance.componentWillUpdate === 'function' &&
+        instance.componentWillUpdate.__suppressDeprecationWarning !== true
+      ) {
+        foundWillUpdateName = 'componentWillUpdate';
+      } else if (typeof instance.UNSAFE_componentWillUpdate === 'function') {
+        foundWillUpdateName = 'UNSAFE_componentWillUpdate';
+      }
+      if (
+        foundWillMountName !== null ||
+        foundWillReceivePropsName !== null ||
+        foundWillUpdateName !== null
+      ) {
+        const componentName = getComponentName(ctor) || 'Component';
+        const newApiName =
+          typeof ctor.getDerivedStateFromProps === 'function'
+            ? 'getDerivedStateFromProps()'
+            : 'getSnapshotBeforeUpdate()';
+        if (!didWarnAboutLegacyLifecyclesAndDerivedState.has(componentName)) {
+          didWarnAboutLegacyLifecyclesAndDerivedState.add(componentName);
+          warningWithoutStack(
+            false,
+            'Unsafe legacy lifecycles will not be called for components using new component APIs.\n\n' +
+              '%s uses %s but also contains the following legacy lifecycles:%s%s%s\n\n' +
+              'The above lifecycles should be removed. Learn more about this warning here:\n' +
+              'https://fb.me/react-async-component-lifecycle-hooks',
+            componentName,
+            newApiName,
+            foundWillMountName !== null ? `\n  ${foundWillMountName}` : '',
+            foundWillReceivePropsName !== null
+              ? `\n  ${foundWillReceivePropsName}`
+              : '',
+            foundWillUpdateName !== null ? `\n  ${foundWillUpdateName}` : '',
+          );
+        }
+      }
+    }
+  }
+
+  // Cache unmasked context so we can avoid recreating masked context unless necessary.
+  // ReactFiberContext usually updates this cache but can't for newly-created instances.
+  if (isContextConsumer) {
+    cacheContext(workInProgress, unmaskedContext, context);
+  }
+
+  return instance;
+}
+```
+
+可以看到ClassComponent对应的instance是当前Component的一个实例化的对象。那么这个instance是什么时候挂载到stateNode上的呢。
+```js
+function adoptClassInstance(workInProgress: Fiber, instance: any): void {
+  instance.updater = classComponentUpdater;
+  workInProgress.stateNode = instance;
+  // The instance needs access to the fiber so that it can schedule updates
+  ReactInstanceMap.set(instance, workInProgress);
+  if (__DEV__) {
+    instance._reactInternalInstance = fakeInternalInstance;
+  }
+}
+```
+可以看到，在一段非常复杂的更新逻辑之后，将instance赋值给了stateNode。
+
+对于HostComponent，就是HTML宿主对象
+```js
+updateHostComponent = function(
+    current: Fiber,
+    workInProgress: Fiber,
+    updatePayload: null | UpdatePayload,
+    type: Type,
+    oldProps: Props,
+    newProps: Props,
+    rootContainerInstance: Container,
+    currentHostContext: HostContext,
+  ) {
+    // If there are no effects associated with this node, then none of our children had any updates.
+    // This guarantees that we can reuse all of them.
+    const childrenUnchanged = workInProgress.firstEffect === null;
+    const currentInstance = current.stateNode;
+    if (childrenUnchanged && updatePayload === null) {
+      // No changes, just reuse the existing instance.
+      // Note that this might release a previous clone.
+      workInProgress.stateNode = currentInstance;
+    } else {
+      let recyclableInstance = workInProgress.stateNode;
+      let newInstance = cloneInstance(
+        currentInstance,
+        updatePayload,
+        type,
+        oldProps,
+        newProps,
+        workInProgress,
+        childrenUnchanged,
+        recyclableInstance,
+      );
+      if (
+        finalizeInitialChildren(
+          newInstance,
+          type,
+          newProps,
+          rootContainerInstance,
+          currentHostContext,
+        )
+      ) {
+        markUpdate(workInProgress);
+      }
+      workInProgress.stateNode = newInstance;
+      if (childrenUnchanged) {
+        // If there are no other effects in this tree, we need to flag this node as having one.
+        // Even though we're not going to use it for anything.
+        // Otherwise parents won't know that there are new children to propagate upwards.
+        markUpdate(workInProgress);
+      } else {
+        // If children might have changed, we have to add them all to the set.
+        appendAllChildren(newInstance, workInProgress);
+      }
+    }
+  };
+```
+```
+export function createInstance(
+  type: string,
+  props: Props,
+  rootContainerInstance: Container,
+  hostContext: HostContext,
+  internalInstanceHandle: Object,
+): Instance {
+  let parentNamespace: string;
+  if (__DEV__) {
+    // TODO: take namespace into account when validating.
+    const hostContextDev = ((hostContext: any): HostContextDev);
+    validateDOMNesting(type, null, hostContextDev.ancestorInfo);
+    if (
+      typeof props.children === 'string' ||
+      typeof props.children === 'number'
+    ) {
+      const string = '' + props.children;
+      const ownAncestorInfo = updatedAncestorInfo(
+        hostContextDev.ancestorInfo,
+        type,
+      );
+      validateDOMNesting(null, string, ownAncestorInfo);
+    }
+    parentNamespace = hostContextDev.namespace;
+  } else {
+    parentNamespace = ((hostContext: any): HostContextProd);
+  }
+  const domElement: Instance = createElement(
+    type,
+    props,
+    rootContainerInstance,
+    parentNamespace,
+  );
+  precacheFiberNode(internalInstanceHandle, domElement);
+  updateFiberProps(domElement, props);
+  return domElement;
+}
+```
+最后调用的是DOM API的createElement方法，生成dom对象。
+
+对于FunctionalComponent
+```js
+function updateFunctionalComponent(
+  current,
+  workInProgress,
+  Component,
+  nextProps: any,
+  renderExpirationTime,
+) {
+  const unmaskedContext = getUnmaskedContext(workInProgress, Component, true);
+  const context = getMaskedContext(workInProgress, unmaskedContext);
+
+  let nextChildren;
+  prepareToReadContext(workInProgress, renderExpirationTime);
+  if (__DEV__) {
+    ReactCurrentOwner.current = workInProgress;
+    ReactCurrentFiber.setCurrentPhase('render');
+    nextChildren = Component(nextProps, context);
+    ReactCurrentFiber.setCurrentPhase(null);
+  } else {
+    nextChildren = Component(nextProps, context);
+  }
+
+  // React DevTools reads this flag.
+  workInProgress.effectTag |= PerformedWork;
+  reconcileChildren(
+    current,
+    workInProgress,
+    nextChildren,
+    renderExpirationTime,
+  );
+  memoizeProps(workInProgress, nextProps);
+  return workInProgress.child;
+}
+```
+直接调用Component方法，并没有对其实例化，所以导致函数式的组件没有instance，也就没有ref。
+
+###新的API
+在react v16.3中新增了React.forwardRef()方法，可以用来把ref属性传递给子组件。
+```js
+export default function forwardRef<Props, ElementType: React$ElementType>(
+  render: (props: Props, ref: React$Ref<ElementType>) => React$Node,
+) {
+  if (__DEV__) {
+    if (typeof render !== 'function') {
+      warningWithoutStack(
+        false,
+        'forwardRef requires a render function but was given %s.',
+        render === null ? 'null' : typeof render,
+      );
+    } else {
+      warningWithoutStack(
+        render.length === 2,
+        'forwardRef render functions accept two parameters: props and ref. ' +
+          'Did you forget to use the ref parameter?',
+      );
+    }
+
+    if (render != null) {
+      warningWithoutStack(
+        render.defaultProps == null && render.propTypes == null,
+        'forwardRef render functions do not support propTypes or defaultProps. ' +
+          'Did you accidentally pass a React component?',
+      );
+    }
+  }
+
+  return {
+    $$typeof: REACT_FORWARD_REF_TYPE,
+    render,
+  };
+}
+```
+主要是增加了一种FORWARD_REF的类型，它对应的更新方法如下：
+```js
+function updateForwardRef(
+  current: Fiber | null,
+  workInProgress: Fiber,
+  type: any,
+  nextProps: any,
+  renderExpirationTime: ExpirationTime,
+) {
+  const render = type.render;
+  const ref = workInProgress.ref;
+  if (hasLegacyContextChanged()) {
+    // Normally we can bail out on props equality but if context has changed
+    // we don't do the bailout and we have to reuse existing props instead.
+  } else if (workInProgress.memoizedProps === nextProps) {
+    const currentRef = current !== null ? current.ref : null;
+    if (ref === currentRef) {
+      return bailoutOnAlreadyFinishedWork(
+        current,
+        workInProgress,
+        renderExpirationTime,
+      );
+    }
+  }
+
+  let nextChildren;
+  if (__DEV__) {
+    ReactCurrentOwner.current = workInProgress;
+    ReactCurrentFiber.setCurrentPhase('render');
+    nextChildren = render(nextProps, ref);
+    ReactCurrentFiber.setCurrentPhase(null);
+  } else {
+    nextChildren = render(nextProps, ref);
+  }
+
+  reconcileChildren(
+    current,
+    workInProgress,
+    nextChildren,
+    renderExpirationTime,
+  );
+  memoizeProps(workInProgress, nextProps);
+  return workInProgress.child;
+}
+```
+将ref作为render函数的第二个参数传入，这样在子组件渲染完后会将子组件的实例挂载到ref上，从而实现在父组件中访问子组件instance的能力。
+
+还有一些其他类型比如HostTextComponent和PlaceholderComponent也有ref属性，这里就不展开讨论了，感兴趣的读者可以自行研究相关代码。
+
+# 总之
+React ref是在react渲染逻辑中产生的组件实例（如果有实例的话，FunctionalComponent就是例外），它提供了直接访问组件实例的能力，满足我们对原生dom能力的需求，也提供了父子组件间实例访问的能力。
