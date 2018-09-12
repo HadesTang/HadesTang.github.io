@@ -1,4 +1,4 @@
-今天写了这样一段代码，希望路由可以这样链式redirect前端路由
+今天写了这样一段代码，希望路由可以这样链式 redirect ：
 
 '' --> 'frontend' --> 'frontend/overview' --> 'frontend/overview/general'
 
@@ -22,9 +22,9 @@
 
 但是却不能成功跳转。为什么勒？
 
-网上基本上找不到相关的资料，只能自己动手打开chrome devTool。
+网上基本上找不到 Angular Router redirect 相关的资料，只能自己动手打开 chrome devTool。
 
-下面是Angular Router 匹配当前路由和注册路由配置的方法，它的最后一个字段是allowRedirects，表示时候可以接受跳转。
+下面是 Angular Router 匹配当前路由和注册路由配置的方法，它的最后一个字段是 allowRedirects ，表示时候可以接受跳转。
 
 ```
   ApplyRedirects.prototype.expandSegment = function (ngModule, segmentGroup, routes, segments, outlet, allowRedirects) {
@@ -53,7 +53,7 @@
   };
 ```
 
-第一次跳转之前，会匹配当前路由，也就是''空路由。
+第一次跳转之前，会匹配当前路由，也就是 '' 空路由。
 
 ```
   ApplyRedirects.prototype.expandSegmentGroup = function (ngModule, routes, segmentGroup, outlet) {
@@ -64,11 +64,11 @@
   };
 ```
 
-这时候allowRedirect的值是true。
+这时候 allowRedirects 的值为 true 。
 
-等到匹配到空路由，这时路由变成'front'。继续从路由配置中寻找'front'。
+等到匹配到空路由，根据路由配置会 redirect 为 'front' 。接下来会继续从路由配置中寻找 'front' 。
 
-但是在经历过一次redirect之后，匹配的方法变成了另一个。
+但是在经历过一次redirect之后，路由匹配的方法变成了另一个。
 
 ```
   ApplyRedirects.prototype.expandRegularSegmentAgainstRouteUsingRedirect = function (ngModule, segmentGroup, routes, route, segments, outlet) {
@@ -86,9 +86,9 @@
   };
 ```
 
-请看最后一行，allowRedirect参数变成了false。
+请看最后一行， allowRedirects 参数变成了false。
 
-我们再看看这个allowRedirect最后到底有什么用。
+我们再看看这个 allowRedirects 参数到底有什么用。
 
 ```
   ApplyRedirects.prototype.expandSegmentAgainstRoute = function (ngModule, segmentGroup, routes, route, paths, outlet, allowRedirects) {
@@ -105,8 +105,8 @@
   };
 ```
 
-就是在这里。如果allowRedirec为false，那么就会返回noMatch哦！
+如果 allowRedirects 为 false ，那么就会返回 noMatch 哦！
 
-所以在Angular Router中，链式redirect是行不通的！
+所以在 Angular Router 中，链式 redirect 是行不通的！
 
 
