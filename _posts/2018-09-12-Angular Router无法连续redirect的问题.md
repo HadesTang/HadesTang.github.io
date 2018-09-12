@@ -24,7 +24,7 @@
 
 网上基本上找不到 Angular Router redirect 相关的资料，只能自己动手打开 chrome devTool。
 
-下面是 Angular Router 匹配当前路由和注册路由配置的方法，它的最后一个字段是 allowRedirects ，表示时候可以接受跳转。
+下面是 Angular Router 匹配当前路由和注册路由配置的方法，它的最后一个字段是 allowRedirects ，表示是否可以接受跳转。
 
 ```
   ApplyRedirects.prototype.expandSegment = function (ngModule, segmentGroup, routes, segments, outlet, allowRedirects) {
